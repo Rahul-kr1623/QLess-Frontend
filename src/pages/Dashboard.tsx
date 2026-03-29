@@ -5,12 +5,26 @@ import LiveFeed from '@/components/LiveFeed';
 import CreateEvent from '@/components/CreateEventSection';
 import Scanner from '@/components/Scanner'; 
 import { useAttendees } from '@/hooks/useAttendees';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { supabase } from '@/lib/supabase'; // 👈 Supabase import
 
 const Dashboard = () => {
-  // refreshData ko destruct kar rahe hain (Make sure hooks/useAttendees.ts me ye return ho raha hai)
   const { total, checkedIn, remaining, recentCheckins, loading, error, refreshData } = useAttendees();
   const [showScanner, setShowScanner] = useState(false);
+
+  // --- AUTO SET EVENT ID ---
+  useEffect(() => {
+    const setFirstEvent = async () => {
+      const storedId = localStorage.getItem('current_event_id');
+      if (!storedId || storedId === 'undefined') {
+        const { data } = await supabase.from('events').select('id').limit(1);
+        if (data && data.length > 0) {
+          localStorage.setItem('current_event_id', data[0].id);
+        }
+      }
+    };
+    setFirstEvent();
+  }, []);
 
   return (
     <div className="flex-1 flex flex-col min-h-screen">
@@ -30,7 +44,6 @@ const Dashboard = () => {
         ) : (
           <>
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-              {/* refreshData ko pass kar rahe hain event create hone par UI update karne ke liye */}
               <CreateEvent onEventCreated={refreshData} />
               
               <button 
@@ -44,7 +57,6 @@ const Dashboard = () => {
               </button>
             </div>
 
-            {/* LIVE SCANNER SECTION */}
             {showScanner && (
               <div className="mt-6 p-6 border-2 border-dashed border-primary/20 rounded-2xl bg-card/50 backdrop-blur-sm animate-in fade-in zoom-in duration-300">
                  <Scanner onScanSuccess={refreshData} />
