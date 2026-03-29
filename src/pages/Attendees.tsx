@@ -2,47 +2,11 @@ import { useState } from 'react';
 import { Search, Check } from 'lucide-react';
 import { toast } from 'sonner';
 import AppHeader from '@/components/AppHeader';
-import Scanner from '@/components/Scanner'; // 👈 Purana panel hatakar naya Scanner import kiya
+import Scanner from '@/components/Scanner';
 import { useAttendees } from '@/hooks/useAttendees';
 
-const extractRegNo = (rawValue: string) => {
-  const value = rawValue.trim();
-  if (!value) return '';
-
-  try {
-    const parsed = JSON.parse(value) as Record<string, unknown> | string;
-    if (typeof parsed === 'string') return parsed.trim();
-
-    const fromJson =
-      parsed.reg_no ??
-      parsed.regNo ??
-      parsed.registration_no ??
-      parsed.registrationNo;
-
-    if (typeof fromJson === 'string') return fromJson.trim();
-  } catch {
-    // ignore JSON parse errors
-  }
-
-  try {
-    if (value.startsWith('http://') || value.startsWith('https://')) {
-      const url = new URL(value);
-      const fromQuery =
-        url.searchParams.get('reg_no') ||
-        url.searchParams.get('regNo') ||
-        url.searchParams.get('registration_no');
-
-      if (fromQuery) return fromQuery.trim();
-    }
-  } catch {
-    // ignore URL parse errors
-  }
-
-  return value;
-};
-
 const Attendees = () => {
-  const { attendees, loading, error, refreshData } = useAttendees(); // 👈 checkIn ki jagah refreshData use karenge
+  const { attendees, loading, error, refreshData } = useAttendees();
   const [search, setSearch] = useState('');
   const [flashId, setFlashId] = useState<string | null>(null);
 
@@ -52,19 +16,24 @@ const Attendees = () => {
       (a.reg_no ?? '').toLowerCase().includes(search.toLowerCase())
   );
 
-  // Manual Check-in logic using our Backend API
   const handleCheckIn = async (regNo: string) => {
+    const currentEventId = localStorage.getItem('current_event_id');
+    if (!currentEventId) {
+        toast.error("Please select an event in Sync tab first!");
+        return;
+    }
+
     try {
       const response = await fetch('https://qless-backend-fubj.onrender.com/mark-attendance', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reg_no: regNo, event_id: 'abcd' }) // 'abcd' ko dynamic kar sakte ho
+        body: JSON.stringify({ reg_no: regNo, event_id: currentEventId })
       });
 
       const data = await response.json();
       if (data.success) {
         toast.success(data.message);
-        refreshData(); // List refresh karo
+        refreshData();
         const attendee = attendees.find(a => a.reg_no === regNo);
         if (attendee) {
           setFlashId(attendee.id);
@@ -82,31 +51,22 @@ const Attendees = () => {
     <div className="flex-1 flex flex-col min-h-screen">
       <AppHeader title="Attendee Live Feed" />
       <main className="flex-1 p-6 space-y-6 max-w-6xl mx-auto w-full">
-        
-        {/* Naya Scanner Component */}
         <div className="glass-card p-4">
           <Scanner onScanSuccess={refreshData} />
         </div>
 
         <div className="relative">
-          <Search
-            size={18}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
-          />
+          <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <input
             type="text"
             placeholder="Search by name or reg no..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full h-11 pl-10 pr-4 rounded-lg bg-card border border-border text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 transition-all duration-200"
+            className="w-full h-11 pl-10 pr-4 rounded-lg bg-card border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 transition-all"
           />
         </div>
 
-        {error && (
-          <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive text-center">
-            {error}
-          </div>
-        )}
+        {error && <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive text-center">{error}</div>}
 
         {loading ? (
           <div className="flex items-center justify-center h-64">
@@ -126,35 +86,18 @@ const Attendees = () => {
                 </thead>
                 <tbody>
                   {filtered.length === 0 ? (
-                    <tr>
-                      <td colSpan={4} className="px-4 py-12 text-center text-muted-foreground">
-                        No attendees found.
-                      </td>
-                    </tr>
+                    <tr><td colSpan={4} className="px-4 py-12 text-center text-muted-foreground">No attendees found.</td></tr>
                   ) : (
                     filtered.map((a) => (
-                      <tr
-                        key={a.id}
-                        className={`border-b border-white/5 transition-all duration-500 ${
-                          flashId === a.id ? 'bg-green-500/20' : 'hover:bg-white/5'
-                        }`}
-                      >
+                      <tr key={a.id} className={`border-b border-white/5 transition-all duration-500 ${flashId === a.id ? 'bg-green-500/20' : 'hover:bg-white/5'}`}>
                         <td className="px-4 py-4 font-medium text-foreground">{a.name}</td>
                         <td className="px-4 py-4 text-muted-foreground hidden sm:table-cell">{a.reg_no}</td>
                         <td className="px-4 py-4 text-muted-foreground hidden md:table-cell">{a.email}</td>
                         <td className="px-4 py-4 text-right">
                           {a.is_present ? (
-                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-500/10 text-green-500 text-xs font-bold border border-green-500/20">
-                              <Check size={12} />
-                              PRESENT
-                            </span>
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-500/10 text-green-500 text-xs font-bold border border-green-500/20"><Check size={12} /> PRESENT</span>
                           ) : (
-                            <button
-                              onClick={() => handleCheckIn(a.reg_no)}
-                              className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-primary/10 text-primary text-xs font-bold hover:bg-primary hover:text-white transition-all duration-200 border border-primary/20"
-                            >
-                              MARK PRESENT
-                            </button>
+                            <button onClick={() => handleCheckIn(a.reg_no)} className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-primary/10 text-primary text-xs font-bold hover:bg-primary hover:text-white transition-all border border-primary/20">MARK PRESENT</button>
                           )}
                         </td>
                       </tr>

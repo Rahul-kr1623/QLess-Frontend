@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Html5QrcodeScanner } from 'html5-qrcode';
-import { CheckCircle2, AlertCircle, QrCode, Loader2 } from 'lucide-react';
+import { CheckCircle2, QrCode, Loader2 } from 'lucide-react';
 
 interface ScannerProps {
   onScanSuccess: () => void;
@@ -33,17 +33,18 @@ const Scanner: React.FC<ScannerProps> = ({ onScanSuccess }) => {
     }, false);
 
     scanner.render(async (text) => {
-      // Cooldown and double-scan prevention
       if (isProcessing || text === lastScanRef.current) return;
       
       setIsProcessing(true);
       lastScanRef.current = text;
+      
+      const currentEventId = localStorage.getItem('current_event_id');
 
       try {
         const response = await fetch('https://qless-backend-fubj.onrender.com/mark-attendance', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ reg_no: text, event_id: 'abcd' }) // Replace with dynamic event ID
+          body: JSON.stringify({ reg_no: text, event_id: currentEventId }) 
         });
 
         const data = await response.json();
@@ -55,7 +56,7 @@ const Scanner: React.FC<ScannerProps> = ({ onScanSuccess }) => {
             setScanResult({ status: 'dup', message: `${data.name}: Already Marked!` });
             playBeep(500, 400);
           }
-          onScanSuccess(); // Refresh Stats
+          onScanSuccess(); 
         } else {
           setScanResult({ status: 'error', message: data.message });
           playBeep(300, 600);
@@ -66,7 +67,7 @@ const Scanner: React.FC<ScannerProps> = ({ onScanSuccess }) => {
         setTimeout(() => {
           setIsProcessing(false);
           setScanResult(null);
-          lastScanRef.current = ""; // Ready for next scan
+          lastScanRef.current = ""; 
         }, 3000);
       }
     }, () => {});
@@ -77,7 +78,6 @@ const Scanner: React.FC<ScannerProps> = ({ onScanSuccess }) => {
   return (
     <div className="flex flex-col items-center gap-6 max-w-sm mx-auto p-4">
       <div id="reader" className="w-full rounded-3xl overflow-hidden shadow-2xl border-4 border-white/10 bg-black"></div>
-      
       <div className={`w-full p-5 rounded-2xl flex items-center justify-center gap-3 border shadow-lg transition-all duration-500 transform ${
         scanResult?.status === 'success' ? 'bg-green-500/20 border-green-500/50 text-green-500 scale-105' :
         scanResult?.status === 'dup' ? 'bg-orange-500/20 border-orange-500/50 text-orange-500' :
