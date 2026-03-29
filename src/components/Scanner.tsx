@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Html5QrcodeScanner } from 'html5-qrcode';
 import { CheckCircle2, QrCode, Loader2 } from 'lucide-react';
-import { supabase } from '@/lib/supabase'; // 👈 Supabase import kiya
+import { supabase } from '@/lib/supabase';
 
 interface ScannerProps {
   onScanSuccess: () => void;
@@ -39,28 +39,33 @@ const Scanner: React.FC<ScannerProps> = ({ onScanSuccess }) => {
       setIsProcessing(true);
       lastScanRef.current = text;
       
-      // --- SAFE ID FETCH LOGIC ---
-      let currentEventId = localStorage.getItem('current_event_id');
-
-      if (!currentEventId || currentEventId === 'undefined') {
-        const { data: events } = await supabase.from('events').select('id').limit(1);
-        if (events && events.length > 0) {
-          currentEventId = events[0].id;
-          localStorage.setItem('current_event_id', currentEventId);
-        }
-      }
-
       try {
+        // --- 1. DIRECT FETCH FROM DB IF LOCALSTORAGE FAILS ---
+        let currentEventId = localStorage.getItem('current_event_id');
+        
+        if (!currentEventId || currentEventId === 'undefined' || currentEventId === 'null') {
+          console.log("Storage empty, fetching event ID from Supabase...");
+          const { data: events } = await supabase.from('events').select('id').limit(1);
+          if (events && events.length > 0) {
+            currentEventId = events[0].id;
+            localStorage.setItem('current_event_id', currentEventId);
+          } else {
+            throw new Error("No event found in database!");
+          }
+        }
+
+        // --- 2. SEND TO BACKEND ---
         const response = await fetch('https://qless-backend-fubj.onrender.com/mark-attendance', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
-            reg_no: text, 
-            event_id: currentEventId // Ab ye 'Missing' nahi hoga
+            reg_no: text.trim(), 
+            event_id: currentEventId 
           }) 
         });
 
         const data = await response.json();
+        
         if (data.success) {
           if (data.type === 'new') {
             setScanResult({ status: 'success', message: `Verified: ${data.name}` });
@@ -74,8 +79,9 @@ const Scanner: React.FC<ScannerProps> = ({ onScanSuccess }) => {
           setScanResult({ status: 'error', message: data.message });
           playBeep(300, 600);
         }
-      } catch (err) {
-        setScanResult({ status: 'error', message: "Server Connection Failed!" });
+      } catch (err: any) {
+        console.error("Scan Error:", err);
+        setScanResult({ status: 'error', message: err.message === "No event found in database!" ? "No Event Active" : "Server Error!" });
       } finally {
         setTimeout(() => {
           setIsProcessing(false);
@@ -100,7 +106,7 @@ const Scanner: React.FC<ScannerProps> = ({ onScanSuccess }) => {
         {isProcessing && !scanResult ? (
           <><Loader2 className="animate-spin" /> <span className="font-bold tracking-widest uppercase text-xs">Processing...</span></>
         ) : scanResult ? (
-          <><CheckCircle2 /> <span className="font-bold text-center">{scanResult.message}</span></>
+          <><span className="font-bold text-center">{scanResult.message}</span></>
         ) : (
           <><QrCode className="animate-pulse" /> <span className="font-medium">Waiting for QR Code</span></>
         )}
