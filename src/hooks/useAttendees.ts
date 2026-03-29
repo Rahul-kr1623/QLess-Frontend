@@ -1,24 +1,29 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/hooks/useAuth'; // 👈 Auth hook import kiya
 
 export const useAttendees = () => {
   const [attendees, setAttendees] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { user } = useAuth(); // 👈 Logged-in user ki ID nikalne ke liye
 
   const refreshData = useCallback(async () => {
+    if (!user?.id) return; // User nahi toh data nahi
+
     try {
       setLoading(true);
       setError(null);
-      
-      // Pehle attendees fetch karte hain
+
+      // Sirf wahi attendees laao jo is logged-in club ke hain
       const { data, error: err } = await supabase
         .from('attendees')
-        .select('*');
+        .select('*')
+        .eq('club_id', user.id); // 👈 Privacy Filter
 
       if (err) throw err;
 
-      // Manually sort in frontend to avoid SQL errors if column missing
+      // Sorting logic (Recent first)
       const sortedData = (data || []).sort((a, b) => {
         const dateA = new Date(a.marked_at || a.created_at).getTime();
         const dateB = new Date(b.marked_at || b.created_at).getTime();
@@ -32,12 +37,13 @@ export const useAttendees = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user?.id]);
 
   useEffect(() => {
     refreshData();
   }, [refreshData]);
 
+  // Stats calculation
   const total = attendees.length;
   const checkedIn = attendees.filter(a => a.is_present).length;
   const remaining = total - checkedIn;
