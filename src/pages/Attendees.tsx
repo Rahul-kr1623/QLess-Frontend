@@ -55,7 +55,7 @@ const Attendees = () => {
   // Manual Check-in logic using our Backend API
   const handleCheckIn = async (regNo: string) => {
     try {
-      const response = await fetch('https://qless-backend-fubj.onrender.com', {
+      const response = await fetch('https://qless-backend-fubj.onrender.com/mark-attendance', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ reg_no: regNo, event_id: 'abcd' }) // 'abcd' ko dynamic kar sakte ho

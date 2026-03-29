@@ -40,7 +40,7 @@ const Scanner: React.FC<ScannerProps> = ({ onScanSuccess }) => {
       lastScanRef.current = text;
 
       try {
-        const response = await fetch('https://qless-backend-fubj.onrender.com', {
+        const response = await fetch('https://qless-backend-fubj.onrender.com/mark-attendance', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ reg_no: text, event_id: 'abcd' }) // Replace with dynamic event ID
